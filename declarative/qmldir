@@ -1,0 +1,2 @@
+module org.asteroid.coprocessor
+plugin asteroidcoprocessorplugin
