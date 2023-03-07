@@ -22,3 +22,12 @@ bool Coprocessor::hasCoprocessor() const
 
     return display->HasCoprocessor();
 }
+bool Coprocessor::synchronizeTime() const
+{
+    if (!display->isValid()) {
+        qDebug() << "No remote connection! Daemon not active?";
+        return false;
+    }
+
+    return display->SynchronizeTime();
+}

@@ -14,6 +14,7 @@ class Coprocessor : public QObject
     ~Coprocessor();
 
     bool hasCoprocessor() const;
+    Q_INVOKABLE bool synchronizeTime() const;
 
    private:
     org::asteroid::display *display;
