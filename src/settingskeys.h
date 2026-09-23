@@ -10,6 +10,7 @@ inline constexpr char StepCounter[] = "/org/asteroidos/coprocessor/step-counter"
 inline constexpr char HeartRate[] = "/org/asteroidos/coprocessor/heart-rate";
 inline constexpr char Motion[] = "/org/asteroidos/coprocessor/motion";
 inline constexpr char DisplayColor[] = "/org/asteroidos/coprocessor/display-color";
+inline constexpr char Use12HourFormat[] = "/org/asteroidos/settings/use-12h-format";
 
 }
 
