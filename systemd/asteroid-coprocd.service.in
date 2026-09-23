@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 Darrel Griët <dgriet@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-only
+
+[Unit]
+Description=AsteroidOS coprocessor daemon
+
+[Service]
+Type=dbus
+BusName=org.asteroid.Coprocessor
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/asteroid-coprocd
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
