@@ -1,25 +1,6 @@
-set(SRC
-    main.cpp
-)
-set(HEADERS
-)
-set(INCLUDES
-    ../dbus/
-)
+add_executable(asteroid-coproc main.cpp)
+target_include_directories(asteroid-coproc PRIVATE ${PROJECT_SOURCE_DIR}/dbus)
+target_link_libraries(asteroid-coproc PRIVATE Qt6::DBus)
 
-qt_add_dbus_interface(SRC
-    ../dbus/org.asteroid.Coprocessor.Display.xml
-    display_interface
-)
-
-qt_add_dbus_interface(SRC
-    ../dbus/org.asteroid.Coprocessor.Hands.xml
-    hands_interface
-)
-
-include_directories(${INCLUDES})
-
-add_executable(asteroid-coproc ${SRC} ${HEADERS})
-
-target_link_libraries(asteroid-coproc
-    Qt6::DBus)
+install(TARGETS asteroid-coproc
+	DESTINATION ${CMAKE_INSTALL_BINDIR})
