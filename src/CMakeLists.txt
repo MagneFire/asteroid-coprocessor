@@ -4,12 +4,15 @@ set(SRC
     display.cpp
     hands.cpp
     propertieschangedrelay.cpp
+    settingsstore.cpp
 )
 set(HEADERS
     backend.h
     display.h
     hands.h
     propertieschangedrelay.h
+    settingsstore.h
+    settingskeys.h
 )
 set(INCLUDES
     ../dbus/
@@ -35,6 +38,12 @@ add_executable(asteroid-coprocd ${SRC} ${HEADERS})
 
 target_link_libraries(asteroid-coprocd PRIVATE
 	Qt6::DBus)
+
+if(MLITE_FOUND)
+	target_sources(asteroid-coprocd PRIVATE dconfsettingsstore.cpp)
+	target_compile_definitions(asteroid-coprocd PRIVATE HAVE_MLITE)
+	target_link_libraries(asteroid-coprocd PRIVATE PkgConfig::MLITE)
+endif()
 
 install(TARGETS asteroid-coprocd
 	DESTINATION ${CMAKE_INSTALL_BINDIR})
