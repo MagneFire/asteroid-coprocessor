@@ -30,7 +30,7 @@ include_directories(${INCLUDES})
 add_executable(asteroid-coprocd ${SRC} ${HEADERS})
 
 target_link_libraries(asteroid-coprocd PRIVATE
-	Qt5::DBus)
+	Qt6::DBus)
 
 install(TARGETS asteroid-coprocd
 	DESTINATION ${CMAKE_INSTALL_BINDIR})

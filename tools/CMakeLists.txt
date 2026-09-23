@@ -22,6 +22,6 @@ include_directories(${INCLUDES})
 add_executable(asteroid-coproc ${SRC} ${HEADERS})
 
 target_link_libraries(asteroid-coproc
-    Qt5::DBus
-    Qt5::Qml
-    Qt5::Quick)
+    Qt6::DBus
+    Qt6::Qml
+    Qt6::Quick)

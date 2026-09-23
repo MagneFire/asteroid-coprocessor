@@ -24,12 +24,12 @@ qt_add_dbus_interface(SRC
 
 include_directories(${INCLUDES})
 
-add_library(asteroidcoprocessorplugin ${SRC} ${HEADERS})
+add_library(asteroidcoprocessorplugin MODULE ${SRC} ${HEADERS})
 
 target_link_libraries(asteroidcoprocessorplugin
-	Qt5::DBus
-	Qt5::Qml
-	Qt5::Quick)
+	Qt6::DBus
+	Qt6::Qml
+	Qt6::Quick)
 
 install(TARGETS asteroidcoprocessorplugin
 	DESTINATION ${INSTALL_QML_IMPORT_DIR}/org/asteroid/coprocessor)
