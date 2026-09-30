@@ -12,7 +12,7 @@
 #include "display_adaptor.h"
 #include "hands_adaptor.h"
 
-using namespace AsteroidOS::CoprocessorDaemon;
+using namespace Coprocessor;
 
 int main(int argc, char** argv)
 {

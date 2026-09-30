@@ -7,7 +7,7 @@
 #include <QObject>
 #include <QDebug>
 
-namespace AsteroidOS::CoprocessorDaemon
+namespace Coprocessor
 {
 
 class Hands : public QObject
@@ -43,5 +43,5 @@ class Backend : public QObject
     Hands hands;
     bool state;
 };
-};      // namespace AsteroidOS::CoprocessorDaemon
+};      // namespace Coprocessor
 #endif  // BACKEND_H

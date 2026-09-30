@@ -6,7 +6,7 @@
 #include <QDebug>
 #include <QSettings>
 
-using namespace AsteroidOS::CoprocessorDaemon;
+using namespace Coprocessor;
 
 const char* CONFIG_FILE = "/etc/asteroid/machine.conf";
 
