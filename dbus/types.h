@@ -12,6 +12,15 @@ inline constexpr char HandsPath[] = "/Hands";
 inline constexpr char DisplayInterface[] = "org.asteroid.Coprocessor.Display";
 inline constexpr char HandsInterface[] = "org.asteroid.Coprocessor.Hands";
 
+namespace Capability {
+enum : unsigned int {
+    TimeSync = 1u << 0,
+    TimepieceMode = 1u << 1,
+    StepCounter = 1u << 2,
+    Hands = 1u << 6,
+};
+}
+
 }
 
 #endif

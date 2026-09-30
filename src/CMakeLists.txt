@@ -1,9 +1,11 @@
 set(SRC
 	main.cpp
     backend.cpp
+    display.cpp
 )
 set(HEADERS
     backend.h
+    display.h
 )
 set(INCLUDES
     ../dbus/
@@ -11,8 +13,8 @@ set(INCLUDES
 
 qt_add_dbus_adaptor(SRC
     ../dbus/org.asteroid.Coprocessor.Display.xml
-    backend.h
-    Coprocessor::Backend
+    display.h
+    Coprocessor::Display
     display_adaptor
 )
 
