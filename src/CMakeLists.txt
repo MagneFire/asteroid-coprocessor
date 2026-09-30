@@ -10,14 +10,14 @@ set(INCLUDES
 )
 
 qt_add_dbus_adaptor(SRC
-    ../dbus/org.aos.display.xml
+    ../dbus/org.asteroid.Coprocessor.Display.xml
     backend.h
     Coprocessor::Backend
     display_adaptor
 )
 
 qt_add_dbus_adaptor(SRC
-    ../dbus/org.aos.hands.xml
+    ../dbus/org.asteroid.Coprocessor.Hands.xml
     backend.h
     Coprocessor::Hands
     hands_adaptor
