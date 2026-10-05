@@ -13,6 +13,9 @@ using namespace Sidekick;
 
 namespace {
 
+constexpr int FirstRetryMs = 1000;
+constexpr int MaxRetryMs = 30000;
+
 constexpr char HwBinderDevice[] = "/dev/hwbinder";
 
 const GBinderClientIfaceInfo Interfaces[] = {
@@ -103,6 +106,8 @@ SidekickClient::SidekickClient(const QString &serviceName, QObject *parent)
     : QObject(parent)
     , m_serviceName(serviceName)
 {
+    m_retry.setSingleShot(true);
+    connect(&m_retry, &QTimer::timeout, this, &SidekickClient::connectToService);
 }
 
 SidekickClient::~SidekickClient()
@@ -158,10 +163,18 @@ bool SidekickClient::connectToService()
     int status = 0;
     GBinderRemoteObject *object = gbinder_servicemanager_get_service_sync(m_manager, name.constData(), &status);
     if (!object) {
-        qInfo() << m_serviceName << "is not registered (status" << status << "), waiting for it";
+        if (m_retryDelayMs == 0)
+            qInfo() << m_serviceName << "is not registered (status" << status << "), waiting for it";
+        scheduleRetry();
         return false;
     }
     return attach(object);
+}
+
+void SidekickClient::scheduleRetry()
+{
+    m_retryDelayMs = m_retryDelayMs ? qMin(m_retryDelayMs * 2, MaxRetryMs) : FirstRetryMs;
+    m_retry.start(m_retryDelayMs);
 }
 
 bool SidekickClient::attach(GBinderRemoteObject *object)
@@ -179,6 +192,8 @@ bool SidekickClient::attach(GBinderRemoteObject *object)
         gbinder_servicemanager_remove_handler(m_manager, m_registrationHandler);
         m_registrationHandler = 0;
     }
+    m_retry.stop();
+    m_retryDelayMs = 0;
     qInfo() << "Connected to" << m_serviceName;
     emit connected();
     return true;

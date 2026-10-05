@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <cstdint>
 #include <optional>
 
@@ -93,6 +94,7 @@ private:
     static void onServiceDied(gbinder_remote_object *object, void *self);
     bool attach(gbinder_remote_object *object);
     void detach();
+    void scheduleRetry();
 
     gbinder_local_request *newRequest(Sidekick::Transaction code) const;
     std::optional<Reply> transact(Sidekick::Transaction code, gbinder_local_request *request, const char *name);
@@ -107,6 +109,8 @@ private:
     gbinder_client *m_client = nullptr;
     unsigned long m_registrationHandler = 0;
     unsigned long m_deathHandler = 0;
+    QTimer m_retry;
+    int m_retryDelayMs = 0;
 };
 
 }
