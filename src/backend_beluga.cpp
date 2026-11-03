@@ -59,20 +59,40 @@ BelugaBackend::BelugaBackend(QObject *parent)
     : Backend(parent)
 {
     connect(&m_client, &SensorHubClient::connected, this, &BelugaBackend::onConnected);
-    connect(&m_client, &SensorHubClient::disconnected, this, &Backend::capabilitiesChanged);
+    connect(&m_client, &SensorHubClient::disconnected, this, [this] {
+        m_mcuReady = false;
+        emit capabilitiesChanged();
+    });
+    connect(&m_client, &SensorHubClient::messageReceived, this, &BelugaBackend::onMessage);
     m_client.connectToService();
 }
 
 void BelugaBackend::onConnected()
 {
     sendWorkMode(Mcu::WorkMode::Normal);
+}
+
+void BelugaBackend::onMessage(int msgId, const QByteArray &payload)
+{
+    if (msgId != Mcu::WorkModeReply)
+        return;
+    Mcu::WorkModeResponse response;
+    if (!Mcu::parseWorkModeResponse(payload, &response)) {
+        qWarning() << "Malformed work mode response from the MCU";
+        return;
+    }
+    qInfo() << "MCU work mode" << response.mode << "last mode" << response.lastMode << "reboot reason"
+            << response.rebootReason << "clock" << response.time << response.timezone;
+    if (m_shuttingDown || m_mcuReady)
+        return;
     m_client.send(Mcu::BootAck);
+    m_mcuReady = true;
     emit capabilitiesChanged();
 }
 
 unsigned int BelugaBackend::capabilities() const
 {
-    return m_client.isConnected() ? Capability::TimepieceMode : 0;
+    return m_client.isConnected() && m_mcuReady ? Capability::TimepieceMode : 0;
 }
 
 bool BelugaBackend::sendWorkMode(Mcu::WorkMode mode)
@@ -113,6 +133,7 @@ void BelugaBackend::leaveTimepiece()
 
 void BelugaBackend::aboutToShutDown()
 {
+    m_shuttingDown = true;
     if (m_wristBandEntered || !m_client.isConnected())
         return;
     if (sendWorkMode(Mcu::WorkMode::PowerOff))

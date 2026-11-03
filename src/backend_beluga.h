@@ -25,9 +25,12 @@ public:
 
 private:
     void onConnected();
+    void onMessage(int msgId, const QByteArray &payload);
     bool sendWorkMode(Mcu::WorkMode mode);
 
     SensorHubClient m_client;
+    bool m_mcuReady = false;
+    bool m_shuttingDown = false;
     bool m_wristBandEntered = false;
 };
 
