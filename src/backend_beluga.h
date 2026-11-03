@@ -4,6 +4,8 @@
 #ifndef BACKEND_BELUGA_H
 #define BACKEND_BELUGA_H
 
+#include <QTimer>
+
 #include "backend.h"
 #include "mcumessages.h"
 #include "sensorhubclient.h"
@@ -26,9 +28,14 @@ public:
 private:
     void onConnected();
     void onMessage(int msgId, const QByteArray &payload);
+    void sendHandshake();
+    void onHandshakeTimeout();
     bool sendWorkMode(Mcu::WorkMode mode);
 
     SensorHubClient m_client;
+    QTimer m_handshakeTimer;
+    QTimer m_resetSettleTimer;
+    int m_handshakeAttempts = 0;
     bool m_mcuReady = false;
     bool m_shuttingDown = false;
     bool m_wristBandEntered = false;

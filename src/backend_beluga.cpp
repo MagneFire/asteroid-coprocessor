@@ -14,6 +14,11 @@ namespace Coprocessor {
 namespace {
 
 constexpr const char *BatteryCapacityPath = "/sys/class/power_supply/battery/capacity";
+constexpr const char *McuResetPath = "/sys/devices/platform/soc/soc:oppo,sensor-hub/reset";
+constexpr int HandshakeTimeoutMs = 3000;
+// After a power off the MCU may not answer until it is reset.
+constexpr int HandshakeMaxAttempts = 4;
+constexpr int ResetSettleMs = 1000;
 // Writing 0 hands the panel to the MCU.
 constexpr const char *ReleasePanelPath = "/sys/devices/virtual/graphics/fb0/mdss_fb_disp_en_gpio";
 // The MCU only takes over a panel that is powered on.
@@ -43,6 +48,16 @@ bool unblankDisplay()
     return true;
 }
 
+bool resetMcu()
+{
+    QFile file(McuResetPath);
+    if (!file.open(QIODevice::WriteOnly) || file.write("1") != 1) {
+        qWarning() << "Unable to reset the MCU:" << file.errorString();
+        return false;
+    }
+    return true;
+}
+
 bool releasePanel()
 {
     QFile file(ReleasePanelPath);
@@ -58,8 +73,16 @@ bool releasePanel()
 BelugaBackend::BelugaBackend(QObject *parent)
     : Backend(parent)
 {
+    m_handshakeTimer.setSingleShot(true);
+    m_handshakeTimer.setInterval(HandshakeTimeoutMs);
+    connect(&m_handshakeTimer, &QTimer::timeout, this, &BelugaBackend::onHandshakeTimeout);
+    m_resetSettleTimer.setSingleShot(true);
+    m_resetSettleTimer.setInterval(ResetSettleMs);
+    connect(&m_resetSettleTimer, &QTimer::timeout, this, &BelugaBackend::sendHandshake);
     connect(&m_client, &SensorHubClient::connected, this, &BelugaBackend::onConnected);
     connect(&m_client, &SensorHubClient::disconnected, this, [this] {
+        m_handshakeTimer.stop();
+        m_resetSettleTimer.stop();
         m_mcuReady = false;
         emit capabilitiesChanged();
     });
@@ -69,7 +92,33 @@ BelugaBackend::BelugaBackend(QObject *parent)
 
 void BelugaBackend::onConnected()
 {
+    m_handshakeAttempts = 0;
+    sendHandshake();
+}
+
+void BelugaBackend::sendHandshake()
+{
+    ++m_handshakeAttempts;
     sendWorkMode(Mcu::WorkMode::Normal);
+    m_handshakeTimer.start();
+}
+
+void BelugaBackend::onHandshakeTimeout()
+{
+    if (m_shuttingDown)
+        return;
+    if (m_handshakeAttempts >= HandshakeMaxAttempts) {
+        qWarning() << "The MCU did not answer after" << m_handshakeAttempts << "attempts";
+        return;
+    }
+    if (m_handshakeAttempts == 1) {
+        qWarning() << "The MCU did not answer, sending again";
+        sendHandshake();
+        return;
+    }
+    qWarning() << "The MCU did not answer, resetting it";
+    resetMcu();
+    m_resetSettleTimer.start();
 }
 
 void BelugaBackend::onMessage(int msgId, const QByteArray &payload)
@@ -83,8 +132,10 @@ void BelugaBackend::onMessage(int msgId, const QByteArray &payload)
     }
     qInfo() << "MCU work mode" << response.mode << "last mode" << response.lastMode << "reboot reason"
             << response.rebootReason << "clock" << response.time << response.timezone;
-    if (m_shuttingDown || m_mcuReady)
+    if (m_shuttingDown || (!m_handshakeTimer.isActive() && m_mcuReady))
         return;
+    m_handshakeTimer.stop();
+    m_resetSettleTimer.stop();
     m_client.send(Mcu::BootAck);
     m_mcuReady = true;
     emit capabilitiesChanged();
@@ -134,6 +185,8 @@ void BelugaBackend::leaveTimepiece()
 void BelugaBackend::aboutToShutDown()
 {
     m_shuttingDown = true;
+    m_handshakeTimer.stop();
+    m_resetSettleTimer.stop();
     if (m_wristBandEntered || !m_client.isConnected())
         return;
     if (sendWorkMode(Mcu::WorkMode::PowerOff))
