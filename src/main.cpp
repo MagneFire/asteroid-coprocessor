@@ -35,6 +35,7 @@ int main(int argc, char **argv)
     const auto backend = createBackend(machineName());
     Display display(backend.get(), settings.get(), requestPowerOff);
     Hands hands(backend.get());
+    ShutdownWatcher shutdownWatcher([&backend] { backend->aboutToShutDown(); });
     new DisplayAdaptor(&display);
     new HandsAdaptor(&hands);
 
