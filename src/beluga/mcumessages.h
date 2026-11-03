@@ -15,6 +15,7 @@ enum MessageId {
     WorkModeNormal = 373,
     WorkModePowerOff = 374,
     WorkModeWristBand = 375,
+    WorkModeReply = 377,
     BootAck = 387,
 };
 
@@ -25,6 +26,19 @@ MessageId workModeMessage(WorkMode mode);
 QByteArray workModePayload(WorkMode mode, const QDateTime &now = QDateTime::currentDateTime());
 
 QByteArray batteryInfoPayload(int capacity, int voltage = 0);
+
+struct WorkModeResponse
+{
+    int mode = 0;
+    int lastMode = 0;
+    // 0 debug, 1 external pin, 2 fault, 3 other.
+    int rebootReason = 0;
+    // Unix seconds and UTC offset minutes, 0 if absent.
+    qint64 time = 0;
+    int timezone = 0;
+};
+
+bool parseWorkModeResponse(const QByteArray &payload, WorkModeResponse *response);
 
 }
 
