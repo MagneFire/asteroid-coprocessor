@@ -26,6 +26,7 @@ public:
     virtual bool synchronizeTime(TimeFormat) { return false; }
     virtual bool prepareTimepiece() { return false; }
     virtual bool enterTimepiece() { return true; }
+    virtual void leaveTimepiece() {}
     virtual void aboutToShutDown() {}
 
     virtual bool setStepCounterEnabled(bool) { return false; }

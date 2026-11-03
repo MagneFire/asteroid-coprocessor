@@ -9,6 +9,10 @@
 #include "backend_mobvoi.h"
 #endif
 
+#ifdef HAVE_GBINDER
+#include "backend_beluga.h"
+#endif
+
 #include <QDebug>
 
 namespace Coprocessor {
@@ -26,6 +30,10 @@ std::unique_ptr<Backend> createBackend(const QString &machine)
         return std::make_unique<MobvoiBackend>(Catfish);
     if (machine == "rubyfish")
         return std::make_unique<MobvoiBackend>(Rubyfish);
+#endif
+#ifdef HAVE_GBINDER
+    if (machine == "beluga")
+        return std::make_unique<BelugaBackend>();
 #endif
     qInfo() << machine << "has no coprocessor support";
     return std::make_unique<Backend>();

@@ -52,6 +52,14 @@ if(HYBRIS_FOUND)
 endif()
 
 if(GBINDER_FOUND)
+	target_sources(asteroid-coprocd PRIVATE
+		backend_beluga.cpp
+		backend_beluga.h
+		beluga/mcumessages.cpp
+		beluga/mcumessages.h
+		beluga/sensorhubclient.cpp
+		beluga/sensorhubclient.h)
+	target_include_directories(asteroid-coprocd PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/beluga)
 	target_compile_definitions(asteroid-coprocd PRIVATE HAVE_GBINDER)
 	target_link_libraries(asteroid-coprocd PRIVATE PkgConfig::GBINDER)
 endif()
