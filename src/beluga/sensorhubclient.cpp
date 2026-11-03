@@ -14,12 +14,18 @@ constexpr const char *BinderDevice = "/dev/binder";
 constexpr const char *ServiceName = "deamonserver";
 constexpr const char *Interface = "com.oppo.sensorhub.service.IDeamonService";
 constexpr guint32 TransactionSendInfo = 1;
+constexpr guint32 TransactionRegisterListener = 2;
+constexpr guint32 TransactionUnregisterListener = 3;
+constexpr const char *ListenerInterface = "com.oppo.sensorhub.service.ISensorDataChangedListener";
+constexpr gint32 DomainMcuFramework = 100;
+constexpr guint TransactionNotify = 1;
 // Without this service every deamonserver reply waits 5 s for it.
 constexpr const char *McuServiceName = "mcu";
 constexpr const char *McuInterface = "android.app.wear.IMcuManager";
 constexpr int MaxPayload = 512;
 constexpr int FirstRetryMs = 500;
 constexpr int MaxRetryMs = 8000;
+constexpr int ListenerRetryMs = 5000;
 
 GBinderLocalReply *onMcuServiceCall(GBinderLocalObject *object, GBinderRemoteRequest *, guint code, guint,
                                     int *status, void *)
@@ -38,11 +44,19 @@ SensorHubClient::SensorHubClient(QObject *parent)
 {
     m_retry.setSingleShot(true);
     connect(&m_retry, &QTimer::timeout, this, &SensorHubClient::connectToService);
+    m_listenerRetry.setSingleShot(true);
+    m_listenerRetry.setInterval(ListenerRetryMs);
+    connect(&m_listenerRetry, &QTimer::timeout, this, &SensorHubClient::finishConnecting);
 }
 
 SensorHubClient::~SensorHubClient()
 {
+    unregisterListener();
     detach();
+    if (m_listener) {
+        gbinder_local_object_drop(m_listener);
+        m_listener = nullptr;
+    }
     if (m_mcuService) {
         gbinder_local_object_drop(m_mcuService);
         m_mcuService = nullptr;
@@ -56,7 +70,7 @@ SensorHubClient::~SensorHubClient()
 
 bool SensorHubClient::isConnected() const
 {
-    return m_client != nullptr;
+    return m_client && m_listenerRegistered;
 }
 
 bool SensorHubClient::connectToService()
@@ -99,6 +113,98 @@ void SensorHubClient::registerMcuService()
     }
 }
 
+bool SensorHubClient::registerListener()
+{
+    if (!m_listener)
+        m_listener = gbinder_servicemanager_new_local_object(m_manager, ListenerInterface, onListenerCall, this);
+
+    GBinderLocalRequest *request = gbinder_client_new_request(m_client);
+    GBinderWriter writer;
+    gbinder_local_request_init_writer(request, &writer);
+    gbinder_writer_append_int32(&writer, DomainMcuFramework);
+    gbinder_writer_append_local_object(&writer, m_listener);
+    int status = 0;
+    GBinderRemoteReply *reply =
+        gbinder_client_transact_sync_reply(m_client, TransactionRegisterListener, request, &status);
+    gbinder_local_request_unref(request);
+    if (!reply) {
+        qWarning() << "Registering the MCU listener failed, binder status" << status;
+        return false;
+    }
+    GBinderReader reader;
+    gbinder_remote_reply_init_reader(reply, &reader);
+    gint32 exception = -1;
+    gint32 result = 0;
+    gbinder_reader_read_int32(&reader, &exception);
+    gbinder_reader_read_int32(&reader, &result);
+    gbinder_remote_reply_unref(reply);
+    if (exception != 0 || result != 1) {
+        // Another client already holds the domain.
+        qWarning() << "Registering the MCU listener failed, exception" << exception << "result" << result;
+        return false;
+    }
+    m_listenerRegistered = true;
+    return true;
+}
+
+void SensorHubClient::unregisterListener()
+{
+    if (!m_client || !m_listenerRegistered)
+        return;
+    GBinderLocalRequest *request = gbinder_client_new_request(m_client);
+    GBinderWriter writer;
+    gbinder_local_request_init_writer(request, &writer);
+    gbinder_writer_append_int32(&writer, DomainMcuFramework);
+    gbinder_writer_append_local_object(&writer, m_listener);
+    int status = 0;
+    GBinderRemoteReply *reply =
+        gbinder_client_transact_sync_reply(m_client, TransactionUnregisterListener, request, &status);
+    gbinder_local_request_unref(request);
+    if (reply)
+        gbinder_remote_reply_unref(reply);
+    m_listenerRegistered = false;
+}
+
+void SensorHubClient::finishConnecting()
+{
+    if (!m_client || m_listenerRegistered)
+        return;
+    if (!registerListener()) {
+        m_listenerRetry.start();
+        return;
+    }
+    emit connected();
+}
+
+GBinderLocalReply *SensorHubClient::onListenerCall(GBinderLocalObject *, GBinderRemoteRequest *request, guint code,
+                                                   guint, int *status, void *self)
+{
+    *status = GBINDER_STATUS_OK;
+    if (code != TransactionNotify)
+        return nullptr;
+
+    GBinderReader reader;
+    gbinder_remote_request_init_reader(request, &reader);
+    gint32 msgId = -1;
+    gint32 hasData = 0;
+    gint32 length = 0;
+    gbinder_reader_read_int32(&reader, &msgId);
+    gbinder_reader_read_int32(&reader, &hasData);
+    QByteArray payload;
+    if (hasData && gbinder_reader_read_int32(&reader, &length) && length > 0) {
+        gsize total = 0;
+        const auto *data = static_cast<const char *>(gbinder_reader_get_data(&reader, &total));
+        // get_data() includes the interface header the reader skipped.
+        const gsize position = total - gbinder_reader_bytes_remaining(&reader);
+        if (data && length <= MaxPayload && position + length <= total)
+            payload = QByteArray(data + position, length);
+    }
+    auto *client = static_cast<SensorHubClient *>(self);
+    // libgbinder calls this on our thread.
+    emit client->messageReceived(msgId, payload);
+    return nullptr;
+}
+
 void SensorHubClient::scheduleRetry()
 {
     m_retryDelayMs = m_retryDelayMs ? qMin(m_retryDelayMs * 2, MaxRetryMs) : FirstRetryMs;
@@ -123,12 +229,14 @@ bool SensorHubClient::attach(GBinderRemoteObject *object)
     m_retry.stop();
     m_retryDelayMs = 0;
     qInfo() << "Connected to" << ServiceName;
-    emit connected();
+    finishConnecting();
     return true;
 }
 
 void SensorHubClient::detach()
 {
+    m_listenerRetry.stop();
+    m_listenerRegistered = false;
     if (m_object && m_deathHandler) {
         gbinder_remote_object_remove_handler(m_object, m_deathHandler);
         m_deathHandler = 0;
