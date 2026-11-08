@@ -27,11 +27,19 @@ enum { Cmd = 1, BatteryInfo = 15 };
 namespace WorkModeResponseField {
 enum { Mode = 1, LastMode = 3, SysTime = 4, RebootReason = 5 };
 }
+namespace OobeNotifyField {
+enum { Status = 1 };
+}
+namespace BootNotifyField {
+enum { Type = 1, Oobe = 2, SysTime = 3 };
+}
 namespace ReadSysTimeField {
 enum { Time = 2, Timezone = 3 };
 }
 
 constexpr int PreferenceCmdBatteryInfo = 17;
+constexpr int OobeDone = 1;
+constexpr int BootNotifyBootCompleted = 2;
 
 void appendVarint(QByteArray &out, std::uint64_t value)
 {
@@ -110,6 +118,14 @@ void appendMessage(QByteArray &out, int field, const QByteArray &body)
     out.append(body);
 }
 
+QByteArray sysTimePayload(const QDateTime &now)
+{
+    QByteArray systemTime;
+    appendInt32(systemTime, SysTimeField::Time, static_cast<std::int32_t>(now.toSecsSinceEpoch()));
+    appendSInt32(systemTime, SysTimeField::Timezone, now.offsetFromUtc() / 60);
+    return systemTime;
+}
+
 }
 
 MessageId workModeMessage(WorkMode mode)
@@ -127,13 +143,9 @@ MessageId workModeMessage(WorkMode mode)
 
 QByteArray workModePayload(WorkMode mode, const QDateTime &now)
 {
-    QByteArray systemTime;
-    appendInt32(systemTime, SysTimeField::Time, static_cast<std::int32_t>(now.toSecsSinceEpoch()));
-    appendSInt32(systemTime, SysTimeField::Timezone, now.offsetFromUtc() / 60);
-
     QByteArray payload;
     appendInt32(payload, WorkModeField::Mode, static_cast<std::int32_t>(mode));
-    appendMessage(payload, WorkModeField::SysTime, systemTime);
+    appendMessage(payload, WorkModeField::SysTime, sysTimePayload(now));
     return payload;
 }
 
@@ -146,6 +158,22 @@ QByteArray batteryInfoPayload(int capacity, int voltage)
     QByteArray payload;
     appendInt32(payload, PreferenceField::Cmd, PreferenceCmdBatteryInfo);
     appendMessage(payload, PreferenceField::BatteryInfo, info);
+    return payload;
+}
+
+QByteArray oobeNotifyPayload()
+{
+    QByteArray payload;
+    appendInt32(payload, OobeNotifyField::Status, OobeDone);
+    return payload;
+}
+
+QByteArray bootNotifyPayload(const QDateTime &now)
+{
+    QByteArray payload;
+    appendInt32(payload, BootNotifyField::Type, BootNotifyBootCompleted);
+    appendMessage(payload, BootNotifyField::Oobe, oobeNotifyPayload());
+    appendMessage(payload, BootNotifyField::SysTime, sysTimePayload(now));
     return payload;
 }
 

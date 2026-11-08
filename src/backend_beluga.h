@@ -30,6 +30,7 @@ private:
     void onMessage(int msgId, const QByteArray &payload);
     void sendHandshake();
     void onHandshakeTimeout();
+    bool sendRetrying(Mcu::MessageId message, const QByteArray &payload);
     bool sendWorkMode(Mcu::WorkMode mode);
 
     SensorHubClient m_client;

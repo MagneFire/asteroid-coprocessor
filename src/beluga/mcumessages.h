@@ -16,6 +16,8 @@ enum MessageId {
     WorkModePowerOff = 374,
     WorkModeWristBand = 375,
     WorkModeReply = 377,
+    OobeNotify = 384,
+    BootNotify = 386,
     BootAck = 387,
 };
 
@@ -26,6 +28,10 @@ MessageId workModeMessage(WorkMode mode);
 QByteArray workModePayload(WorkMode mode, const QDateTime &now = QDateTime::currentDateTime());
 
 QByteArray batteryInfoPayload(int capacity, int voltage = 0);
+
+QByteArray oobeNotifyPayload();
+
+QByteArray bootNotifyPayload(const QDateTime &now = QDateTime::currentDateTime());
 
 struct WorkModeResponse
 {

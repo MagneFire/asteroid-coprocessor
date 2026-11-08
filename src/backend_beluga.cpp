@@ -23,7 +23,7 @@ constexpr int ResetSettleMs = 1000;
 constexpr const char *ReleasePanelPath = "/sys/devices/virtual/graphics/fb0/mdss_fb_disp_en_gpio";
 // The MCU only takes over a panel that is powered on.
 constexpr unsigned long UnblankSettleMs = 1000;
-constexpr unsigned long WorkModeRetryMs = 100;
+constexpr unsigned long SendRetryMs = 100;
 // The reply is not awaited, so give the MCU a moment.
 constexpr unsigned long PowerOffSettleMs = 500;
 
@@ -123,8 +123,10 @@ void BelugaBackend::onHandshakeTimeout()
 
 void BelugaBackend::onMessage(int msgId, const QByteArray &payload)
 {
-    if (msgId != Mcu::WorkModeReply)
+    if (msgId != Mcu::WorkModeReply) {
+        qDebug() << "MCU message" << msgId << payload.toHex();
         return;
+    }
     Mcu::WorkModeResponse response;
     if (!Mcu::parseWorkModeResponse(payload, &response)) {
         qWarning() << "Malformed work mode response from the MCU";
@@ -137,6 +139,9 @@ void BelugaBackend::onMessage(int msgId, const QByteArray &payload)
     m_handshakeTimer.stop();
     m_resetSettleTimer.stop();
     m_client.send(Mcu::BootAck);
+    if (!sendRetrying(Mcu::BootNotify, Mcu::bootNotifyPayload())
+        || !sendRetrying(Mcu::OobeNotify, Mcu::oobeNotifyPayload()))
+        qWarning() << "Unable to tell the MCU the setup is done";
     m_mcuReady = true;
     emit capabilitiesChanged();
 }
@@ -146,13 +151,17 @@ unsigned int BelugaBackend::capabilities() const
     return m_client.isConnected() && m_mcuReady ? Capability::TimepieceMode : 0;
 }
 
+bool BelugaBackend::sendRetrying(Mcu::MessageId message, const QByteArray &payload)
+{
+    if (m_client.send(message, payload))
+        return true;
+    QThread::msleep(SendRetryMs);
+    return m_client.send(message, payload);
+}
+
 bool BelugaBackend::sendWorkMode(Mcu::WorkMode mode)
 {
-    const auto message = Mcu::workModeMessage(mode);
-    if (m_client.send(message, Mcu::workModePayload(mode)))
-        return true;
-    QThread::msleep(WorkModeRetryMs);
-    return m_client.send(message, Mcu::workModePayload(mode));
+    return sendRetrying(Mcu::workModeMessage(mode), Mcu::workModePayload(mode));
 }
 
 bool BelugaBackend::prepareTimepiece()
