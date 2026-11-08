@@ -52,6 +52,17 @@ void appendInt32(QByteArray &out, int field, std::int32_t value)
     appendVarint(out, static_cast<std::uint64_t>(static_cast<std::int64_t>(value)));
 }
 
+void appendSInt32(QByteArray &out, int field, std::int32_t value)
+{
+    appendInt32(out, field, (value << 1) ^ (value >> 31));
+}
+
+std::int32_t decodeSInt32(std::uint64_t value)
+{
+    const auto raw = static_cast<std::uint32_t>(value);
+    return static_cast<std::int32_t>((raw >> 1) ^ -(raw & 1));
+}
+
 bool readVarint(const QByteArray &in, int *position, std::uint64_t *value)
 {
     *value = 0;
@@ -118,7 +129,7 @@ QByteArray workModePayload(WorkMode mode, const QDateTime &now)
 {
     QByteArray systemTime;
     appendInt32(systemTime, SysTimeField::Time, static_cast<std::int32_t>(now.toSecsSinceEpoch()));
-    appendInt32(systemTime, SysTimeField::Timezone, now.offsetFromUtc() / 60);
+    appendSInt32(systemTime, SysTimeField::Timezone, now.offsetFromUtc() / 60);
 
     QByteArray payload;
     appendInt32(payload, WorkModeField::Mode, static_cast<std::int32_t>(mode));
@@ -154,7 +165,7 @@ bool parseWorkModeResponse(const QByteArray &payload, WorkModeResponse *response
                 if (timeField == ReadSysTimeField::Time)
                     response->time = static_cast<qint64>(static_cast<std::int32_t>(timeValue));
                 else if (timeField == ReadSysTimeField::Timezone)
-                    response->timezone = static_cast<std::int32_t>(timeValue);
+                    response->timezone = decodeSInt32(timeValue);
             });
             break;
         case WorkModeResponseField::RebootReason:
